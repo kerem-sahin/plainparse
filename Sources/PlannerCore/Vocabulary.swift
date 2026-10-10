@@ -11,6 +11,18 @@ public enum ParserLanguage: Sendable {
     }
 }
 
+/// A part of the day ("akşam", "morning") that hints at a time and shifts bare hours that follow it.
+enum DayPart: Sendable {
+    case morning, noon, afternoon, evening, night
+}
+
+struct DayPartWord: Sendable {
+    var phrases: [[String]]
+    var kind: DayPart
+    /// Minute of the day used when no explicit time is given; nil when the word only shifts a following hour.
+    var defaultMinute: Int?
+}
+
 /// The words the quick-add parser listens for in one language. All entries are already folded
 /// (lowercase, no Turkish letters) because tokens are folded before they are compared.
 struct Vocabulary: Sendable {
@@ -24,6 +36,8 @@ struct Vocabulary: Sendable {
     /// Phrases that mean "Monday to Friday" on their own ("hafta ici", "weekdays").
     var weekdaysPhrases: [[String]]
     var weekendPhrases: [[String]]
+    /// "weekend" as a one-off date (the coming Saturday). Plural forms stay repeat-only.
+    var weekendDatePhrases: [[String]]
     /// Phrases that repeat without "every" ("daily", "weekly", "monthly").
     var dailyAlone: [[String]]
     var weeklyAlone: [[String]]
@@ -35,9 +49,18 @@ struct Vocabulary: Sendable {
     /// Words that push a weekday into next week ("haftaya", "next").
     var nextPrefixes: Set<String>
     var nextAloneMeansWeek: Bool
+    /// "bu", "this": a no-op word in front of a weekday, weekend or day part.
+    var thisPrefixes: Set<String>
+    /// Count before the unit ("in 3 days") or after it ("3 gün sonra").
+    var relativeBefore: Set<String>
+    var relativeAfter: Set<String>
+    var relativeUnits: [String: Calendar.Component]
 
     var weekdayNames: [(iso: Int, names: [String])]
     var weekdaySuffixes: Set<String>
+    /// Weekday names that are also ordinary nouns ("pazar" is Sunday and market): they only count
+    /// in the exact form and with a cue (followed by a marker or a time, or after "bu"/"haftaya"/"her").
+    var ambiguousWeekdayNames: Set<String>
     /// Words that follow a weekday and belong to it ("günü").
     var weekdayMarkers: Set<String>
     var monthNames: [[String]]
@@ -48,6 +71,11 @@ struct Vocabulary: Sendable {
     var deadlineSuffixWords: Set<String>
     var deadlinePrefixWords: Set<String>
     var timePrefixWords: Set<String>
+    /// Endings allowed after an apostrophe on a bare hour ("18'de").
+    var locativeSuffixes: Set<String>
+    var dayParts: [DayPartWord]
+    /// Words after a day-part word that make it part of a noun ("akşam yemeği").
+    var dayPartBlockers: Set<String>
     var usesMeridiem: Bool
     var slashDateDayFirst: Bool
 
@@ -59,7 +87,8 @@ struct Vocabulary: Sendable {
         weekWord: ["hafta"],
         monthWord: ["ay"],
         weekdaysPhrases: [["hafta", "ici"]],
-        weekendPhrases: [["hafta", "sonu"]],
+        weekendPhrases: [["hafta", "sonu"], ["haftasonu"]],
+        weekendDatePhrases: [["hafta", "sonu"], ["haftasonu"]],
         dailyAlone: [],
         weeklyAlone: [],
         monthlyAlone: [],
@@ -68,11 +97,16 @@ struct Vocabulary: Sendable {
         dayAfterTomorrow: [["obur", "gun"], ["obur", "gunu"]],
         nextPrefixes: ["haftaya"],
         nextAloneMeansWeek: true,
+        thisPrefixes: ["bu", "gelecek"],
+        relativeBefore: [],
+        relativeAfter: ["sonra"],
+        relativeUnits: ["gun": .day, "hafta": .weekOfYear, "ay": .month],
         weekdayNames: [
             (1, ["pazartesi"]), (2, ["sali"]), (3, ["carsamba"]), (4, ["persembe"]),
             (5, ["cuma"]), (6, ["cumartesi"]), (7, ["pazar"]),
         ],
         weekdaySuffixes: ["ya", "ye", "a", "e", "dan", "den", "ki"],
+        ambiguousWeekdayNames: ["pazar"],
         weekdayMarkers: ["gunu", "gunleri", "gunler"],
         monthNames: [
             ["ocak"], ["subat"], ["mart"], ["nisan"], ["mayis"], ["haziran"],
@@ -85,6 +119,17 @@ struct Vocabulary: Sendable {
         deadlineSuffixWords: ["kadar"],
         deadlinePrefixWords: [],
         timePrefixWords: ["saat"],
+        locativeSuffixes: ["de", "da", "te", "ta"],
+        dayParts: [
+            DayPartWord(phrases: [["sabah"]], kind: .morning, defaultMinute: 9 * 60),
+            DayPartWord(phrases: [["ogle"], ["oglen"]], kind: .noon, defaultMinute: 12 * 60),
+            DayPartWord(phrases: [["aksam"]], kind: .evening, defaultMinute: 19 * 60),
+            DayPartWord(phrases: [["gece"]], kind: .night, defaultMinute: nil),
+        ],
+        dayPartBlockers: [
+            "yemegi", "yemek", "yemekleri", "kahvaltisi", "namazi", "ezani", "rutini",
+            "haberleri", "ogunu", "vardiyasi", "nobeti",
+        ],
         usesMeridiem: false,
         slashDateDayFirst: true
     )
@@ -99,6 +144,7 @@ struct Vocabulary: Sendable {
             monthWord: ["month"],
             weekdaysPhrases: [["weekdays"], ["weekday"]],
             weekendPhrases: [["weekends"], ["weekend"]],
+            weekendDatePhrases: [["weekend"]],
             dailyAlone: [["daily"]],
             weeklyAlone: [["weekly"]],
             monthlyAlone: [["monthly"]],
@@ -107,12 +153,20 @@ struct Vocabulary: Sendable {
             dayAfterTomorrow: [["day", "after", "tomorrow"]],
             nextPrefixes: ["next"],
             nextAloneMeansWeek: false,
+            thisPrefixes: ["this"],
+            relativeBefore: ["in"],
+            relativeAfter: [],
+            relativeUnits: [
+                "day": .day, "days": .day, "week": .weekOfYear, "weeks": .weekOfYear,
+                "month": .month, "months": .month,
+            ],
             weekdayNames: [
                 (1, ["monday"]), (2, ["tuesday", "tue", "tues"]), (3, ["wednesday", "wed"]),
                 (4, ["thursday", "thu", "thur", "thurs"]), (5, ["friday", "fri"]),
                 (6, ["saturday"]), (7, ["sunday"]),
             ],
             weekdaySuffixes: [],
+            ambiguousWeekdayNames: [],
             weekdayMarkers: [],
             monthNames: [
                 ["january", "jan"], ["february", "feb"], ["march"], ["april", "apr"], ["may"], ["june"],
@@ -126,6 +180,16 @@ struct Vocabulary: Sendable {
             deadlineSuffixWords: [],
             deadlinePrefixWords: ["by", "until", "before", "on"],
             timePrefixWords: ["at"],
+            locativeSuffixes: [],
+            dayParts: [
+                DayPartWord(phrases: [["morning"]], kind: .morning, defaultMinute: 9 * 60),
+                DayPartWord(phrases: [["noon"]], kind: .noon, defaultMinute: 12 * 60),
+                DayPartWord(phrases: [["afternoon"]], kind: .afternoon, defaultMinute: 15 * 60),
+                DayPartWord(phrases: [["evening"]], kind: .evening, defaultMinute: 18 * 60),
+                DayPartWord(phrases: [["tonight"]], kind: .evening, defaultMinute: 20 * 60),
+                DayPartWord(phrases: [["midnight"]], kind: .night, defaultMinute: 0),
+            ],
+            dayPartBlockers: ["routine", "news"],
             usesMeridiem: true,
             slashDateDayFirst: slashDateDayFirst
         )
