@@ -2,7 +2,7 @@ import Foundation
 
 /// Something that sits at a time of day: a fixed-schedule slot (class, training, shift) or a timed task.
 public struct TimedItem: Sendable, Equatable, Identifiable {
-    public enum Kind: Sendable { case fixed, task }
+    public enum Kind: Sendable { case fixed, task, event }
 
     public let id: UUID
     public let title: String
@@ -45,10 +45,10 @@ public enum DayClock {
         return .none
     }
 
-    /// Free stretches between fixed items (back-to-back and overlapping items merge).
+    /// Free stretches between busy items: weekly fixed blocks and calendar events (back-to-back and overlapping merge).
     public static func gaps(between items: [TimedItem], minLength: Int = 20) -> [Range<Int>] {
         let blocks = items
-            .filter { $0.kind == .fixed }
+            .filter { $0.kind == .fixed || $0.kind == .event }
             .compactMap { item in item.endMinute.map { item.startMinute..<$0 } }
             .sorted { $0.lowerBound < $1.lowerBound }
         guard var current = blocks.first else { return [] }
