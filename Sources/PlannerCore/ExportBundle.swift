@@ -59,6 +59,19 @@ public struct ExportCompletion: Codable, Equatable, Sendable {
     }
 }
 
+public struct ExportStep: Codable, Equatable, Sendable {
+    public var title: String
+    public var done: Bool
+    /// Ticked days of a repeating task's step, as "yyyy-MM-dd".
+    public var doneDays: [String]
+
+    public init(title: String, done: Bool, doneDays: [String]) {
+        self.title = title
+        self.done = done
+        self.doneDays = doneDays
+    }
+}
+
 public struct ExportTask: Codable, Equatable, Sendable {
     public var id: String
     public var title: String
@@ -73,11 +86,13 @@ public struct ExportTask: Codable, Equatable, Sendable {
     public var listID: String?
     public var createdAt: Date
     public var completions: [ExportCompletion]
+    /// Steps of the task, in order (absent in backups made before steps existed).
+    public var steps: [ExportStep]?
 
     public init(
         id: String, title: String, notes: String, day: String?, reminderMinute: Int?, done: Bool,
         completedAt: Date?, repeatKind: String, repeatWeekdays: [Int], listID: String?,
-        createdAt: Date, completions: [ExportCompletion]
+        createdAt: Date, completions: [ExportCompletion], steps: [ExportStep]? = nil
     ) {
         self.id = id
         self.title = title
@@ -91,6 +106,7 @@ public struct ExportTask: Codable, Equatable, Sendable {
         self.listID = listID
         self.createdAt = createdAt
         self.completions = completions
+        self.steps = steps
     }
 }
 
@@ -118,6 +134,7 @@ public extension ExportBundle {
     func csv() -> String {
         let names = Dictionary(lists.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         var rows = [["title", "list", "day", "time", "repeat", "done", "notes"]]
+        // Steps go into the notes column as lines, so a spreadsheet keeps one row per task.
         for task in tasks {
             let time = task.reminderMinute.map { String(format: "%02d:%02d", $0 / 60, $0 % 60) } ?? ""
             var repeating = task.repeatKind == "none" ? "" : task.repeatKind
@@ -129,7 +146,8 @@ public extension ExportBundle {
                 time,
                 repeating,
                 task.done ? "yes" : "no",
-                task.notes,
+                ([task.notes] + (task.steps ?? []).map { ($0.done ? "[x] " : "[ ] ") + $0.title })
+                    .filter { !$0.isEmpty }.joined(separator: "\n"),
             ])
         }
         return rows.map { $0.map(Self.csvField).joined(separator: ",") }.joined(separator: "\r\n") + "\r\n"
