@@ -38,4 +38,11 @@ struct StepDaysTests {
         let raw = "2026-10-11"
         #expect(!StepDays.contains(raw, day: day(1), calendar: calendar))
     }
+
+    @Test func dayStringIsZeroPaddedInTheGivenCalendar() {
+        var zone = Calendar(identifier: .gregorian)
+        zone.timeZone = TimeZone(identifier: "Pacific/Auckland")!
+        let date = zone.date(from: DateComponents(year: 2026, month: 3, day: 5, hour: 1))!
+        #expect(StepDays.dayString(date, calendar: zone) == "2026-03-05")
+    }
 }
