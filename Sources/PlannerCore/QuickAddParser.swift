@@ -95,6 +95,8 @@ public struct QuickAddParser: Sendable {
 
         let today = calendar.startOfDay(for: now)
         var rule = RepeatRule.none
+        /// "her sabah": the part of the day is the time of a daily task, so it leaves the title even with no hour.
+        var everyDayPart = false
 
         // Repeat phrases first: their weekday names must not be read as one-off dates.
         var i = 0
@@ -145,6 +147,18 @@ public struct QuickAddParser: Sendable {
                     if rule.kind != .weekly { rule = .daily }
                     consume(i...next, as: .repeating)
                     i = next + 1
+                    continue
+                }
+                // "her sabah", "every evening": every day, at that part of the day. Only "her" is the
+                // repeat; the part of the day is read below as the time. ("her akşam yemeği" is a noun.)
+                if v.dayParts.contains(where: { entry in
+                    guard let length = phrase(entry.phrases, at: next) else { return false }
+                    return !(free(next + length) && v.dayPartBlockers.contains(tokens[next + length].folded))
+                }) {
+                    if rule.kind != .weekly { rule = .daily }
+                    consume(i...i, as: .repeating)
+                    everyDayPart = true
+                    i = next
                     continue
                 }
                 if v.weekWord.contains(tokens[next].folded) {
@@ -396,7 +410,7 @@ public struct QuickAddParser: Sendable {
             i += 1
         }
 
-        if let dayPart, (dayPart.start...dayPart.end).allSatisfy({ free($0) }), minute != nil || dayPart.defaultMinute != nil {
+        if let dayPart, (dayPart.start...dayPart.end).allSatisfy({ free($0) }), minute != nil || dayPart.defaultMinute != nil || everyDayPart {
             consume(dayPart.start...dayPart.end, as: .time)
         }
         if minute == nil, let fallback = dayPart?.defaultMinute {
@@ -591,8 +605,14 @@ public struct QuickAddParser: Sendable {
     /// "18", "18'de": an hour with no minutes. `locative` is true for the Turkish "'de/'da/'te/'ta" ending.
     private static func bareHour(_ token: String, _ v: Vocabulary) -> (hour: Int, leadingZero: Bool, hasSuffix: Bool, locative: Bool)? {
         let apostrophe = token.firstIndex(where: { $0 == "'" || $0 == "’" })
-        let base = apostrophe.map { String(token[..<$0]) } ?? token
-        let suffix = apostrophe.map { String(token[token.index(after: $0)...]) }
+        var base = apostrophe.map { String(token[..<$0]) } ?? token
+        var suffix = apostrophe.map { String(token[token.index(after: $0)...]) }
+        // People often leave the apostrophe out: "8de", "18de".
+        if apostrophe == nil {
+            let digits = String(token.prefix(while: \.isASCIIDigit))
+            let rest = String(token.dropFirst(digits.count))
+            if !digits.isEmpty, v.locativeSuffixes.contains(rest) { base = digits; suffix = rest }
+        }
         guard !base.isEmpty, base.count <= 2, base.allSatisfy(\.isASCIIDigit),
               let hour = Int(base), (0...23).contains(hour)
         else { return nil }

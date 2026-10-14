@@ -303,4 +303,58 @@ struct ParserRefinementTests {
         #expect(en.parse("ilaç al", now: now).title == "İlaç al")
         #expect(en.parse("iphone case", now: now).title == "Iphone case")
     }
+
+    // MARK: "her sabah" and "8de"
+
+    @Test func everyMorningIsDailyAtThatHour() {
+        let entry = tr.parse("Her sabah 8de", now: now)
+        #expect(entry.rule == .daily)
+        #expect(entry.minute == 8 * 60)
+        #expect(entry.day == date(2026, 10, 9))
+    }
+
+    @Test func everyMorningWithoutAnHourUsesTheDefault() {
+        let entry = tr.parse("her sabah koşu", now: now)
+        #expect(entry.rule == .daily)
+        #expect(entry.minute == 9 * 60)
+        #expect(entry.title == "Koşu")
+    }
+
+    @Test func everyEveningHourIsTheEvening() {
+        let entry = tr.parse("her akşam 8 yürüyüş", now: now)
+        #expect(entry.rule == .daily)
+        #expect(entry.minute == 20 * 60)
+        #expect(entry.title == "Yürüyüş")
+    }
+
+    @Test func everyNightHasNoTimeButLeavesTheTitle() {
+        let entry = tr.parse("her gece vitamin", now: now)
+        #expect(entry.rule == .daily)
+        #expect(entry.minute == nil)
+        #expect(entry.title == "Vitamin")
+    }
+
+    @Test func everyMorningInEnglish() {
+        let entry = en.parse("every morning run", now: now)
+        #expect(entry.rule == .daily)
+        #expect(entry.minute == 9 * 60)
+        #expect(entry.title == "Run")
+    }
+
+    @Test func everyDinnerNounIsNotARepeat() {
+        let entry = tr.parse("her akşam yemeği hazırla", now: now)
+        #expect(entry.rule == .none)
+    }
+
+    @Test func hourWithSuffixButNoApostrophe() {
+        #expect(tr.parse("yarın 8de koşu", now: now).minute == 8 * 60)
+        #expect(tr.parse("yarın 18de annemi ara", now: now).minute == 18 * 60)
+        #expect(tr.parse("akşam 8de yürüyüş", now: now).minute == 20 * 60)
+        #expect(tr.parse("yarın 5te toplantı", now: now).minute == tr.parse("yarın 5'te toplantı", now: now).minute)
+    }
+
+    @Test func aNumberWithAnotherEndingIsNotAnHour() {
+        #expect(tr.parse("3kg elma al", now: now).minute == nil)
+        #expect(tr.parse("2adet süt", now: now).minute == nil)
+    }
 }
