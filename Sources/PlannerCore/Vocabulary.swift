@@ -33,6 +33,10 @@ struct Vocabulary: Sendable {
     var dayWord: Set<String>
     var weekWord: Set<String>
     var monthWord: Set<String>
+    /// Words between "every month" and the day of the month ("on the 1st").
+    var monthDayFillers: Set<String>
+    /// Endings that make a number a day of the month ("1'i", "2'sinde").
+    var monthDayEndings: Set<String>
     /// Phrases that mean "Monday to Friday" on their own ("hafta ici", "weekdays").
     var weekdaysPhrases: [[String]]
     var weekendPhrases: [[String]]
@@ -85,7 +89,13 @@ struct Vocabulary: Sendable {
         every: ["her"],
         dayWord: ["gun"],
         weekWord: ["hafta"],
-        monthWord: ["ay"],
+        monthWord: ["ay", "ayin"],
+        monthDayFillers: [],
+        monthDayEndings: [
+            "i", "ı", "u", "ü", "si", "sı", "su", "sü", "yi", "yı",
+            "inde", "ında", "unda", "ünde", "sinde", "sında", "sunda", "sünde",
+            "inda", "unde", "sinda", "sunde",
+        ],
         weekdaysPhrases: [["hafta", "ici"]],
         weekendPhrases: [["hafta", "sonu"], ["haftasonu"]],
         weekendDatePhrases: [["hafta", "sonu"], ["haftasonu"]],
@@ -142,6 +152,8 @@ struct Vocabulary: Sendable {
             dayWord: ["day"],
             weekWord: ["week"],
             monthWord: ["month"],
+            monthDayFillers: ["on", "the"],
+            monthDayEndings: [],
             weekdaysPhrases: [["weekdays"], ["weekday"]],
             weekendPhrases: [["weekends"], ["weekend"]],
             weekendDatePhrases: [["weekend"]],

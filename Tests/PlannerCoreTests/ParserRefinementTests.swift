@@ -357,4 +357,58 @@ struct ParserRefinementTests {
         #expect(tr.parse("3kg elma al", now: now).minute == nil)
         #expect(tr.parse("2adet süt", now: now).minute == nil)
     }
+
+    // MARK: Pre-release audit
+
+    @Test func thisEveningLateIsStillToday() {
+        let late = date(2026, 10, 9, 19, 30)
+        #expect(tr.parse("bu akşam annemi ara", now: late).day == date(2026, 10, 9))
+        #expect(tr.parse("akşam annemi ara", now: late).day == date(2026, 10, 9))
+        #expect(en.parse("this evening call mom", now: date(2026, 10, 9, 18, 30)).day == date(2026, 10, 9))
+        // An explicit hour that has passed still means tomorrow.
+        #expect(tr.parse("akşam 7 annemi ara", now: date(2026, 10, 9, 21, 0)).day == date(2026, 10, 10))
+    }
+
+    @Test func tonightHasADayAndLeavesTheTitle() {
+        let entry = tr.parse("bu gece film", now: now)
+        #expect(entry.day == date(2026, 10, 9))
+        #expect(entry.title == "Film")
+    }
+
+    @Test func dottedPairJustPastIsATime() {
+        let entry = tr.parse("15.10 toplantı", now: date(2026, 10, 16, 9, 0))
+        #expect(entry.minute == 15 * 60 + 10)
+        #expect(entry.title == "Toplantı")
+        // Still a date when it is near.
+        #expect(tr.parse("20.10 toplantı", now: date(2026, 10, 16, 9, 0)).day == date(2026, 10, 20))
+    }
+
+    @Test func weekdaysJoinedAreAWeeklyRepeat() {
+        let entry = tr.parse("pazartesi ve perşembe 18:00 spor", now: now)
+        #expect(entry.rule == RepeatRule(kind: .weekly, weekdayMask: Weekday.bit(1) | Weekday.bit(4)))
+        #expect(entry.minute == 18 * 60)
+        #expect(entry.title == "Spor")
+        // One weekday alone stays a one-off.
+        #expect(tr.parse("pazartesi spor", now: now).rule == .none)
+    }
+
+    @Test func monthlyByDayOfMonth() {
+        let rent = tr.parse("her ayın 1'i kira", now: date(2026, 10, 16, 9, 0))
+        #expect(rent.rule == RepeatRule(kind: .monthly))
+        #expect(rent.day == date(2026, 11, 1))
+        #expect(rent.title == "Kira")
+        let bill = tr.parse("her ay 20'sinde fatura", now: date(2026, 10, 16, 9, 0))
+        #expect(bill.day == date(2026, 10, 20))
+        #expect(bill.title == "Fatura")
+        let english = en.parse("every month on the 1st pay rent", now: date(2026, 10, 16, 9, 0))
+        #expect(english.rule == RepeatRule(kind: .monthly))
+        #expect(english.day == date(2026, 11, 1))
+        #expect(english.title == "Pay rent")
+    }
+
+    @Test func atNoonLeavesNoAt() {
+        let entry = en.parse("lunch at noon", now: now)
+        #expect(entry.title == "Lunch")
+        #expect(entry.minute == 12 * 60)
+    }
 }

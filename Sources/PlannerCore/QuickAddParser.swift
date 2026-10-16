@@ -98,6 +98,54 @@ public struct QuickAddParser: Sendable {
         /// "her sabah": the part of the day is the time of a daily task, so it leaves the title even with no hour.
         var everyDayPart = false
 
+        /// "pazartesi ve perşembe", "Mon, Wed and Fri": the weekdays of a chain starting at `start`.
+        func weekdayChain(from start: Int) -> (mask: Int, last: Int, count: Int)? {
+            guard free(start), let first = Self.weekday(of: tokens[start].folded, v, cued: true) else { return nil }
+            var mask = Weekday.bit(first)
+            var last = start
+            var count = 1
+            var j = start + 1
+            while free(j) {
+                let previousEndsWithComma = tokens[j - 1].raw.hasSuffix(",")
+                if v.conjunctions.contains(tokens[j].folded), free(j + 1),
+                   let day = Self.weekday(of: tokens[j + 1].folded, v, cued: true) {
+                    mask |= Weekday.bit(day)
+                    last = j + 1
+                    j += 2
+                    count += 1
+                } else if previousEndsWithComma, let day = Self.weekday(of: tokens[j].folded, v, cued: true) {
+                    mask |= Weekday.bit(day)
+                    last = j
+                    j += 1
+                    count += 1
+                } else {
+                    break
+                }
+            }
+            if free(last + 1), v.weekdayMarkers.contains(tokens[last + 1].folded) {
+                last += 1
+            }
+            return (mask, last, count)
+        }
+
+        /// The start of a monthly series named by its day: "her ayın 1'i", "every month on the 1st". The series
+        /// starts on the next such day (today when it is today).
+        var monthlyStart: Date?
+        func monthDay(after index: Int) -> (day: Int, last: Int)? {
+            var j = index
+            while free(j), v.monthDayFillers.contains(tokens[j].folded) { j += 1 }
+            guard free(j), let number = Self.dayOfMonth(tokens[j].folded, v) else { return nil }
+            return (number, j)
+        }
+        func nextDate(withDay number: Int) -> Date? {
+            for offset in 0...62 {
+                guard let candidate = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
+                let length = calendar.range(of: .day, in: .month, for: candidate)?.count ?? 31
+                if calendar.component(.day, from: candidate) == min(number, length) { return candidate }
+            }
+            return nil
+        }
+
         // Repeat phrases first: their weekday names must not be read as one-off dates.
         var i = 0
         while i < tokens.count {
@@ -169,37 +217,29 @@ public struct QuickAddParser: Sendable {
                 }
                 if v.monthWord.contains(tokens[next].folded) {
                     rule = RepeatRule(kind: .monthly)
-                    consume(i...next, as: .repeating)
-                    i = next + 1
-                    continue
-                }
-                if let first = Self.weekday(of: tokens[next].folded, v, cued: true) {
-                    var mask = Weekday.bit(first)
                     var last = next
-                    var j = next + 1
-                    while free(j) {
-                        let previousEndsWithComma = tokens[j - 1].raw.hasSuffix(",")
-                        if v.conjunctions.contains(tokens[j].folded), free(j + 1),
-                           let day = Self.weekday(of: tokens[j + 1].folded, v, cued: true) {
-                            mask |= Weekday.bit(day)
-                            last = j + 1
-                            j += 2
-                        } else if previousEndsWithComma, let day = Self.weekday(of: tokens[j].folded, v, cued: true) {
-                            mask |= Weekday.bit(day)
-                            last = j
-                            j += 1
-                        } else {
-                            break
-                        }
+                    if let named = monthDay(after: next + 1) {
+                        monthlyStart = nextDate(withDay: named.day)
+                        last = named.last
                     }
-                    if free(last + 1), v.weekdayMarkers.contains(tokens[last + 1].folded) {
-                        last += 1
-                    }
-                    rule = RepeatRule(kind: .weekly, weekdayMask: mask)
                     consume(i...last, as: .repeating)
                     i = last + 1
                     continue
                 }
+                if let chain = weekdayChain(from: next) {
+                    rule = RepeatRule(kind: .weekly, weekdayMask: chain.mask)
+                    consume(i...chain.last, as: .repeating)
+                    i = chain.last + 1
+                    continue
+                }
+            }
+            // "pazartesi ve perşembe spor": two or more weekdays joined together mean every one of them.
+            // (A single weekday stays a one-off date.)
+            if !v.every.contains(word), let chain = weekdayChain(from: i), chain.count >= 2 {
+                rule = RepeatRule(kind: .weekly, weekdayMask: chain.mask)
+                consume(i...chain.last, as: .repeating)
+                i = chain.last + 1
+                continue
             }
             i += 1
         }
@@ -211,6 +251,8 @@ public struct QuickAddParser: Sendable {
             var end: Int
             var kind: DayPart
             var defaultMinute: Int?
+            /// "bu akşam", "this evening": the part of today, never tomorrow.
+            var isThis: Bool
         }
         var dayPart: FoundDayPart?
         search: for index in tokens.indices where free(index) {
@@ -220,7 +262,7 @@ public struct QuickAddParser: Sendable {
                 if free(end + 1), v.dayPartBlockers.contains(tokens[end + 1].folded) { continue }
                 var start = index
                 if free(index - 1), v.thisPrefixes.contains(tokens[index - 1].folded) { start = index - 1 }
-                dayPart = FoundDayPart(start: start, end: end, kind: entry.kind, defaultMinute: entry.defaultMinute)
+                dayPart = FoundDayPart(start: start, end: end, kind: entry.kind, defaultMinute: entry.defaultMinute, isThis: start != index)
                 break search
             }
         }
@@ -339,6 +381,10 @@ public struct QuickAddParser: Sendable {
                     day = date
                     consumeDate(i...i)
                 } else if let date = numericDate(word, separator: ".", dayFirst: v.slashDateDayFirst, today: today, fullOnly: !allowShortDotted),
+                          // "15.10" the day after 15 October is a time ("15:10"), not a date a year away.
+                          !(allowShortDotted && word.split(separator: ".").count == 2
+                            && Self.clockParts(word, v) != nil
+                            && (calendar.dateComponents([.day], from: today, to: date).day ?? 0) > 60),
                           !(free(i - 1) && v.timePrefixWords.contains(tokens[i - 1].folded)),
                           !(v.usesMeridiem && free(i + 1) && Self.meridiem(tokens[i + 1].folded) != nil),
                           !(dayPart.map { $0.end + 1 == i } ?? false) {
@@ -410,11 +456,16 @@ public struct QuickAddParser: Sendable {
             i += 1
         }
 
-        if let dayPart, (dayPart.start...dayPart.end).allSatisfy({ free($0) }), minute != nil || dayPart.defaultMinute != nil || everyDayPart {
-            consume(dayPart.start...dayPart.end, as: .time)
+        var minuteFromDayPart = false
+        if let dayPart, (dayPart.start...dayPart.end).allSatisfy({ free($0) }),
+           minute != nil || dayPart.defaultMinute != nil || everyDayPart || dayPart.isThis {
+            var lower = dayPart.start
+            if free(lower - 1), v.timePrefixWords.contains(tokens[lower - 1].folded) { lower -= 1 }
+            consume(lower...dayPart.end, as: .time)
         }
         if minute == nil, let fallback = dayPart?.defaultMinute {
             minute = fallback
+            minuteFromDayPart = true
         }
 
         // "cumaya kadar", "18:00'a kadar": the deadline word belongs to the date or time.
@@ -426,11 +477,22 @@ public struct QuickAddParser: Sendable {
             }
         }
 
+        if day == nil, rule.kind == .monthly, let monthlyStart {
+            day = monthlyStart
+        }
         if day == nil {
+            let nowMinute = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
             if rule.isRepeating {
                 day = today
+            } else if let dayPart, dayPart.isThis {
+                // "bu akşam" at 21:00 is still this evening.
+                day = today
+            } else if let dayPart, minuteFromDayPart, dayPart.kind == .evening || dayPart.kind == .night,
+                      nowMinute < Self.endMinute(of: dayPart.kind) {
+                // "akşam annemi ara" while it is still evening: today, not tomorrow. (A morning that has
+                // passed still means tomorrow morning.)
+                day = today
             } else if let minute {
-                let nowMinute = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
                 day = minute > nowMinute ? today : calendar.date(byAdding: .day, value: 1, to: today)
             }
         }
@@ -530,6 +592,26 @@ public struct QuickAddParser: Sendable {
         guard !digits.isEmpty, digits.count <= 2, digits.allSatisfy(\.isASCIIDigit), let value = Int(digits), (1...31).contains(value)
         else { return nil }
         return value
+    }
+
+    /// When a part of the day is over, for "akşam" typed late in the evening.
+    private static func endMinute(of part: DayPart) -> Int {
+        switch part {
+        case .morning: 12 * 60
+        case .noon: 15 * 60
+        case .afternoon: 18 * 60
+        case .evening, .night: 24 * 60
+        }
+    }
+
+    /// "1'i", "2'sinde", "15'inde", "1st", "1": a day of the month.
+    private static func dayOfMonth(_ token: String, _ v: Vocabulary) -> Int? {
+        if let number = dayNumber(token, v) { return number }
+        let digits = String(token.prefix(while: \.isASCIIDigit))
+        guard !digits.isEmpty, digits.count <= 2, let value = Int(digits), (1...31).contains(value) else { return nil }
+        var rest = String(token.dropFirst(digits.count))
+        if rest.hasPrefix("'") || rest.hasPrefix("’") { rest.removeFirst() }
+        return v.monthDayEndings.contains(rest) ? value : nil
     }
 
     private static func withoutSuffix(_ token: String) -> String {
