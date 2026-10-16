@@ -5,7 +5,6 @@ import Foundation
 public enum Weekday {
     public static let weekdaysMask = 0b0011111
     public static let weekendMask = 0b1100000
-    public static let allMask = 0b1111111
 
     public static func iso(of date: Date, calendar: Calendar) -> Int {
         let sundayFirst = calendar.component(.weekday, from: date)
