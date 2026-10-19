@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 /// Reference "now": Friday 9 October 2026, 11:06.
 struct ParserRefinementTests {

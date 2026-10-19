@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 struct DayClockTests {
     let morningClass = TimedItem(id: UUID(), title: "A", kind: .fixed, startMinute: 8 * 60 + 30, endMinute: 10 * 60 + 10)

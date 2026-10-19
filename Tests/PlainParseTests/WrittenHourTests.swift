@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 /// Hours written as words: "saat sekizde", "on ikide", "dokuz buçukta", "at eight thirty".
 /// Now: Friday 9 October 2026, 11:06.

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 /// "alarm" in the bar: an alarm instead of a notification, only with a time. Now: Friday 9 October 2026, 11:06.
 struct AlarmWordTests {

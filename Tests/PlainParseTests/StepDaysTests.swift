@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 struct StepDaysTests {
     private var calendar: Calendar {

@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "PlannerCore",
+    name: "PlainParse",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
-        .library(name: "PlannerCore", targets: ["PlannerCore"]),
+        .library(name: "PlainParse", targets: ["PlainParse"]),
     ],
     targets: [
-        .target(name: "PlannerCore"),
-        .testTarget(name: "PlannerCoreTests", dependencies: ["PlannerCore"]),
+        .target(name: "PlainParse"),
+        .testTarget(name: "PlainParseTests", dependencies: ["PlainParse"]),
     ]
 )

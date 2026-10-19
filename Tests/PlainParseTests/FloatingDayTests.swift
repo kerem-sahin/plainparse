@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 struct FloatingDayTests {
     private func calendar(_ zone: String) -> Calendar {

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 struct RepeatRuleTests {
     @Test func noneNeverOccurs() {

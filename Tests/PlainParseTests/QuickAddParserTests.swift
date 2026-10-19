@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import PlannerCore
+@testable import PlainParse
 
 struct QuickAddParserTests {
     let parser = QuickAddParser(calendar: calendar, preferredLanguage: .turkish, slashDateDayFirst: true)
