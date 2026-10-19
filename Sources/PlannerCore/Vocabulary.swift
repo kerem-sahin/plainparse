@@ -82,6 +82,23 @@ struct Vocabulary: Sendable {
     var dayPartBlockers: Set<String>
     /// Words that ask for an alarm instead of a notification, longest first ("alarm kur" before "alarm").
     var alarmPhrases: [[String]]
+    /// Hours written as words: "sekiz", "eight".
+    var hourWords: [String: Int]
+    /// The first word of a two-word hour and the largest second word it takes: "on iki" (12), "yirmi üç" (23).
+    var compoundHourTens: [String: (value: Int, maxUnit: Int)]
+    /// Endings on a written hour that make it a time ("sekizde", "sekize").
+    var hourWordSuffixes: [String]
+    /// Written hours whose stem changes with the ending ("dört" → "dörde").
+    var irregularHourForms: [String: Int]
+    /// Written hours that are everyday words too ("birde", "onda", "ikide"): only a time after "saat" or a day part.
+    var cueOnlyHourWords: Set<String>
+    /// "buçuk", "buçukta": half past.
+    var halfHourWords: Set<String>
+    /// The half-past words that carry a time ending ("buçukta"): enough on their own to make a time.
+    /// A bare "buçuk" is not ("iki buçuk kilo").
+    var halfHourEndings: Set<String>
+    /// Minutes written after a written hour: "eight thirty", "seven o'clock".
+    var minuteWords: [String: Int]
     var usesMeridiem: Bool
     var slashDateDayFirst: Bool
 
@@ -143,6 +160,17 @@ struct Vocabulary: Sendable {
             "haberleri", "ogunu", "vardiyasi", "nobeti",
         ],
         alarmPhrases: [["alarm", "kur"], ["alarmli"], ["alarmla"], ["alarm"]],
+        hourWords: [
+            "bir": 1, "iki": 2, "uc": 3, "dort": 4, "bes": 5, "alti": 6, "yedi": 7, "sekiz": 8, "dokuz": 9,
+            "on": 10, "yirmi": 20,
+        ],
+        compoundHourTens: ["on": (10, 9), "yirmi": (20, 3)],
+        hourWordSuffixes: ["de", "da", "te", "ta", "ye", "ya", "e", "a"],
+        irregularHourForms: ["dorde": 4],
+        cueOnlyHourWords: ["bir", "iki", "on"],
+        halfHourWords: ["bucuk", "bucukta", "bucukda", "bucuga"],
+        halfHourEndings: ["bucukta", "bucukda", "bucuga"],
+        minuteWords: [:],
         usesMeridiem: false,
         slashDateDayFirst: true
     )
@@ -206,6 +234,18 @@ struct Vocabulary: Sendable {
             ],
             dayPartBlockers: ["routine", "news"],
             alarmPhrases: [["with", "an", "alarm"], ["with", "alarm"], ["set", "an", "alarm"], ["set", "alarm"], ["alarm"]],
+            hourWords: [
+                "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+                "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+            ],
+            compoundHourTens: [:],
+            hourWordSuffixes: [],
+            irregularHourForms: [:],
+            // Every English hour word is an everyday number: it is a time only with "at", am/pm or minutes.
+            cueOnlyHourWords: ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"],
+            halfHourWords: [],
+            halfHourEndings: [],
+            minuteWords: ["fifteen": 15, "thirty": 30, "forty-five": 45, "o'clock": 0, "oclock": 0],
             usesMeridiem: true,
             slashDateDayFirst: slashDateDayFirst
         )

@@ -403,11 +403,56 @@ public struct QuickAddParser: Sendable {
         // a following am/pm, or a day part in front ("akşam 8").
         var minute: Int?
 
+        /// "sekizde", "on ikide", "dokuz buçukta", "eight thirty": an hour in words, with the index of its last
+        /// token. `cued` is false for a bare number word ("sekiz", "eight") or an everyday word ("birde", "onda"),
+        /// which are a time only after "saat"/"at", a day part or am/pm.
+        func writtenHour(at j: Int) -> (hour: Int, minute: Int, last: Int, cued: Bool)? {
+            guard free(j) else { return nil }
+            func read(_ word: String) -> (value: Int, base: String, suffixed: Bool)? {
+                let plain = Self.withoutSuffix(word)
+                if let value = v.hourWords[plain] { return (value, plain, plain != word) }
+                if let value = v.irregularHourForms[word] { return (value, word, true) }
+                for suffix in v.hourWordSuffixes where plain.hasSuffix(suffix) {
+                    let base = String(plain.dropLast(suffix.count))
+                    if let value = v.hourWords[base] { return (value, base, true) }
+                }
+                return nil
+            }
+            var hour: Int
+            var last = j
+            var cued: Bool
+            if let tens = v.compoundHourTens[tokens[j].folded], free(j + 1),
+               let unit = read(tokens[j + 1].folded), unit.value <= tens.maxUnit {
+                // "on iki", "on ikide": a two-word hour is not an everyday phrase, an ending is enough.
+                hour = tens.value + unit.value
+                last = j + 1
+                cued = unit.suffixed
+            } else if let single = read(tokens[j].folded) {
+                hour = single.value
+                cued = single.suffixed && !v.cueOnlyHourWords.contains(single.base)
+            } else {
+                return nil
+            }
+            guard (0...23).contains(hour) else { return nil }
+            var minute = 0
+            if free(last + 1), v.halfHourWords.contains(tokens[last + 1].folded) {
+                minute = 30
+                last += 1
+                if v.halfHourEndings.contains(tokens[last].folded) { cued = true }
+            } else if free(last + 1), let written = v.minuteWords[tokens[last + 1].folded] {
+                minute = written
+                last += 1
+                cued = true
+            }
+            return (hour, minute, last, cued)
+        }
+
         func timeCandidate(at j: Int, prefixed: Bool, part: DayPart?) -> (end: Int, minute: Int)? {
             guard free(j) else { return nil }
             let token = tokens[j].folded
             let hour: Int
-            let minutes: Int
+            var minutes: Int
+            var last = j
             var meridiemValue: Bool?
             var leadingZero = false
             if let clock = Self.clockParts(token, v) {
@@ -416,22 +461,33 @@ public struct QuickAddParser: Sendable {
                 meridiemValue = clock.pm
                 leadingZero = clock.leadingZero
             } else if let bare = Self.bareHour(token, v) {
+                // "8 buçukta", "saat 8 buçuk": half past. With its ending ("buçukta") it also makes the 8 an hour;
+                // a bare "buçuk" does not ("2 buçuk kilo").
+                let half = !bare.hasSuffix && free(j + 1) && v.halfHourWords.contains(tokens[j + 1].folded)
+                let halfWithEnding = half && v.halfHourEndings.contains(tokens[j + 1].folded)
                 let followedByMeridiem = v.usesMeridiem && free(j + 1) && Self.meridiem(tokens[j + 1].folded) != nil
-                let allowed = prefixed || bare.locative
+                let allowed = prefixed || bare.locative || halfWithEnding
                     || (!bare.hasSuffix && (part != nil || followedByMeridiem))
                 guard allowed else { return nil }
                 hour = bare.hour
-                minutes = 0
+                minutes = half ? 30 : 0
+                if half { last = j + 1 }
                 leadingZero = bare.leadingZero
+            } else if let written = writtenHour(at: j) {
+                let followedByMeridiem = v.usesMeridiem && free(written.last + 1) && Self.meridiem(tokens[written.last + 1].folded) != nil
+                guard written.cued || prefixed || part != nil || followedByMeridiem else { return nil }
+                hour = written.hour
+                minutes = written.minute
+                last = written.last
             } else {
                 return nil
             }
 
             if let meridiemValue {
-                return (j, Self.twentyFourHour(hour, minute: minutes, meridiem: meridiemValue))
+                return (last, Self.twentyFourHour(hour, minute: minutes, meridiem: meridiemValue))
             }
-            if v.usesMeridiem, free(j + 1), (1...12).contains(hour), let spoken = Self.meridiem(tokens[j + 1].folded) {
-                return (j + 1, Self.twentyFourHour(hour, minute: minutes, meridiem: spoken))
+            if v.usesMeridiem, free(last + 1), (1...12).contains(hour), let spoken = Self.meridiem(tokens[last + 1].folded) {
+                return (last + 1, Self.twentyFourHour(hour, minute: minutes, meridiem: spoken))
             }
             var adjusted = hour
             if (1...12).contains(hour), let part {
@@ -439,7 +495,7 @@ public struct QuickAddParser: Sendable {
             } else if prefixed, (1...6).contains(hour), !leadingZero {
                 adjusted = hour + 12
             }
-            return (j, adjusted * 60 + minutes)
+            return (last, adjusted * 60 + minutes)
         }
 
         i = 0
