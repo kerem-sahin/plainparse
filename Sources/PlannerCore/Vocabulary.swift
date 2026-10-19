@@ -80,6 +80,8 @@ struct Vocabulary: Sendable {
     var dayParts: [DayPartWord]
     /// Words after a day-part word that make it part of a noun ("akşam yemeği").
     var dayPartBlockers: Set<String>
+    /// Words that ask for an alarm instead of a notification, longest first ("alarm kur" before "alarm").
+    var alarmPhrases: [[String]]
     var usesMeridiem: Bool
     var slashDateDayFirst: Bool
 
@@ -140,6 +142,7 @@ struct Vocabulary: Sendable {
             "yemegi", "yemek", "yemekleri", "kahvaltisi", "namazi", "ezani", "rutini",
             "haberleri", "ogunu", "vardiyasi", "nobeti",
         ],
+        alarmPhrases: [["alarm", "kur"], ["alarmli"], ["alarmla"], ["alarm"]],
         usesMeridiem: false,
         slashDateDayFirst: true
     )
@@ -202,6 +205,7 @@ struct Vocabulary: Sendable {
                 DayPartWord(phrases: [["midnight"]], kind: .night, defaultMinute: 0),
             ],
             dayPartBlockers: ["routine", "news"],
+            alarmPhrases: [["with", "an", "alarm"], ["with", "alarm"], ["set", "an", "alarm"], ["set", "alarm"], ["alarm"]],
             usesMeridiem: true,
             slashDateDayFirst: slashDateDayFirst
         )

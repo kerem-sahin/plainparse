@@ -12,7 +12,7 @@ public struct ListRef: Sendable, Equatable {
 
 /// A recognised piece of the typed text, as character offsets into the original string.
 public struct Highlight: Sendable, Equatable {
-    public enum Kind: Sendable { case date, time, repeating, list }
+    public enum Kind: Sendable { case date, time, repeating, list, alarm }
 
     public var kind: Kind
     public var range: Range<Int>
@@ -30,6 +30,8 @@ public struct ParsedEntry: Sendable, Equatable {
     public var rule: RepeatRule
     public var listID: UUID?
     public var highlights: [Highlight]
+    /// "7:00 alarm", "alarmlı": ring as an alarm, not a quiet notification. Only with a time.
+    public var alarm: Bool = false
 }
 
 /// Turns one line such as "Cuma fizyoloji ödevi 18:00" or "friday math homework 6pm" into a task.
@@ -497,6 +499,28 @@ public struct QuickAddParser: Sendable {
             }
         }
 
+        // "alarm" only means something with a time; without one it stays part of the title ("alarm saati al").
+        // It has to sit at either end of the line or next to what was understood, so a word in the middle
+        // of a sentence is left alone.
+        var alarm = false
+        if minute != nil {
+            func touchesUnderstood(_ index: Int) -> Bool {
+                guard index >= 0, index < tokens.count else { return false }
+                return used.contains(index)
+            }
+            var index = 0
+            while index < tokens.count, !alarm {
+                if let length = phrase(v.alarmPhrases, at: index) {
+                    let last = index + length - 1
+                    if index == 0 || last == tokens.count - 1 || touchesUnderstood(index - 1) || touchesUnderstood(last + 1) {
+                        consume(index...last, as: .alarm)
+                        alarm = true
+                    }
+                }
+                index += 1
+            }
+        }
+
         let listID = matchList(tokens: tokens, used: used, lists: lists, highlights: &highlights)
 
         let title = tokens.enumerated()
@@ -515,7 +539,8 @@ public struct QuickAddParser: Sendable {
             minute: minute,
             rule: rule,
             listID: listID,
-            highlights: highlights.sorted { $0.range.lowerBound < $1.range.lowerBound }
+            highlights: highlights.sorted { $0.range.lowerBound < $1.range.lowerBound },
+            alarm: alarm
         )
     }
 
