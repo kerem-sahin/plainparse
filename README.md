@@ -4,7 +4,7 @@
 
 PlainParse reads a line like `Cuma fizyoloji ödevi 18:00` or `friday math homework 6pm` and works out the title, the day, the time, the repeat rule, the list and whether it should ring as an alarm. Foundation only, no dependencies, no network, no AI model: it runs instantly on the device.
 
-It powers the quick-add bar of [plainday](https://github.com/kerem-sahin/kerem-sahin), a day planner for iPhone.
+It powers the quick-add bar of [plainday](https://apps.apple.com/tr/app/plainday/id6823780735), a day planner for iPhone.
 
 | Input | Title | Day | Time | Repeat |
 |---|---|---|---|---|
