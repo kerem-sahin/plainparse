@@ -49,4 +49,16 @@ struct DayClockTests {
         let second = TimedItem(id: UUID(), title: "2", kind: .fixed, startMinute: 655, endMinute: 700)
         #expect(DayClock.gaps(between: [first, second]).isEmpty)
     }
+
+    @Test func aTaskWithAnEndTakesUpTime() {
+        let meeting = TimedItem(id: UUID(), title: "T", kind: .task, startMinute: 11 * 60, endMinute: 12 * 60)
+        #expect(DayClock.gaps(between: [morningClass, meeting, afternoonClass]) == [(10 * 60 + 10)..<(11 * 60), (12 * 60)..<(13 * 60 + 20)])
+        #expect(DayClock.gaps(between: [morningClass, evening, afternoonClass]) == [(10 * 60 + 10)..<(13 * 60 + 20)])
+    }
+
+    /// A 1.1 device moves a "14:00–16:00" task to 17:00 and keeps the end it does not know: no crash, no block.
+    @Test func anEndBeforeTheStartIsIgnored() {
+        let moved = TimedItem(id: UUID(), title: "T", kind: .task, startMinute: 17 * 60, endMinute: 16 * 60)
+        #expect(DayClock.gaps(between: [morningClass, moved, afternoonClass]) == [(10 * 60 + 10)..<(13 * 60 + 20)])
+    }
 }

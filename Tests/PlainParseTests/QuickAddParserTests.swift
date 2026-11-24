@@ -170,6 +170,29 @@ struct QuickAddParserTests {
         #expect(entry.listID == list.id)
     }
 
+    @Test func aGenericWordDoesNotPickAList() {
+        // "giriş" in "KPSS giriş belgesi" is not the course "Tıbbi Görüntüleme Giriş".
+        let list = ListRef(id: UUID(), name: "Tıbbi Görüntüleme Giriş")
+        let basics = ListRef(id: UUID(), name: "Hemşirelik Temelleri")
+        #expect(parser.parse("KPSS giriş belgesi çıktısı", now: now, lists: [list, basics]).listID == nil)
+        #expect(parser.parse("temel maaş hesabı", now: now, lists: [list, basics]).listID == nil)
+        #expect(parser.parse("tıbbi rapor al", now: now, lists: [list, basics]).listID == list.id)
+        #expect(parser.parse("hemşirelik ödevi", now: now, lists: [list, basics]).listID == basics.id)
+    }
+
+    @Test func aOneWordListStillMatchesItsWord() {
+        let list = ListRef(id: UUID(), name: "Giriş")
+        #expect(parser.parse("giriş sınavı", now: now, lists: [list]).listID == list.id)
+    }
+
+    @Test func listMatchedByItsWholeName() {
+        let home = ListRef(id: UUID(), name: "Ev İşleri")
+        let entry = parser.parse("ev işleri bulaşık", now: now, lists: [home])
+        #expect(entry.listID == home.id)
+        #expect(entry.highlights.contains(Highlight(kind: .list, range: 0..<9)))
+        #expect(parser.parse("işleri bitir", now: now, lists: [home]).listID == nil)
+    }
+
     @Test func noListWhenNothingMatches() {
         let entry = parser.parse("annemi ara", now: now, lists: [fizyoloji, anatomi])
         #expect(entry.listID == nil)

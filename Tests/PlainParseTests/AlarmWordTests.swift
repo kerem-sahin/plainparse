@@ -57,4 +57,11 @@ struct AlarmWordTests {
     @Test func plainTimeIsNotAnAlarm() {
         #expect(!tr.parse("yarın 7:00 koşu", now: now).alarm)
     }
+
+    @Test func anAlarmWithNothingElseIsNamedAlarm() {
+        let entry = tr.parse("hafta içi 7:30 alarm", now: now)
+        #expect(entry.alarm)
+        #expect(entry.title == "Alarm")
+        #expect(entry.minute == 7 * 60 + 30)
+    }
 }

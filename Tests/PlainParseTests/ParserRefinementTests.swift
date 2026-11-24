@@ -286,7 +286,18 @@ struct ParserRefinementTests {
         #expect(en.parse("standup 3:30", now: now).minute == 3 * 60 + 30)
         #expect(tr.parse("3:30 toplantı", now: now).minute == 3 * 60 + 30)
         #expect(en.parse("call at 3pm", now: now).minute == 15 * 60)
-        #expect(tr.parse("3'te toplantı", now: now).minute == 3 * 60)
+    }
+
+    @Test func aSpokenSmallHourIsAfternoon() {
+        // "3'te", "üçte" are said, not read off a clock: three in the afternoon, as after "saat".
+        #expect(tr.parse("3'te toplantı", now: now).minute == 15 * 60)
+        #expect(tr.parse("üçte toplantı", now: now).minute == 15 * 60)
+        #expect(tr.parse("6'da maç", now: now).minute == 18 * 60)
+        #expect(tr.parse("iki buçukta ders", now: now).minute == 14 * 60 + 30)
+        #expect(tr.parse("gece 3'te uçak", now: now).minute == 3 * 60)
+        #expect(tr.parse("sabah 6'da koşu", now: now).minute == 6 * 60)
+        #expect(tr.parse("7'de kalk", now: now).minute == 7 * 60)
+        #expect(tr.parse("03'te ilaç", now: now).minute == 3 * 60)
     }
 
     // MARK: 7. Capitalisation

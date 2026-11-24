@@ -45,11 +45,11 @@ public enum DayClock {
         return .none
     }
 
-    /// Free stretches between busy items: weekly fixed blocks and calendar events (back-to-back and overlapping merge).
+    /// Free stretches between busy items: weekly fixed blocks, calendar events and tasks with an end (back-to-back and overlapping merge).
     public static func gaps(between items: [TimedItem], minLength: Int = 20) -> [Range<Int>] {
         let blocks = items
-            .filter { $0.kind == .fixed || $0.kind == .event }
-            .compactMap { item in item.endMinute.map { item.startMinute..<$0 } }
+            .filter { $0.kind == .fixed || $0.kind == .event || ($0.kind == .task && $0.endMinute != nil) }
+            .compactMap { item in item.endMinute.flatMap { $0 > item.startMinute ? item.startMinute..<$0 : nil } }
             .sorted { $0.lowerBound < $1.lowerBound }
         guard var current = blocks.first else { return [] }
         var gaps: [Range<Int>] = []

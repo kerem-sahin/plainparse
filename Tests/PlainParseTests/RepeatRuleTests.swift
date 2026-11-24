@@ -55,7 +55,7 @@ struct RepeatRuleTests {
     }
 
     @Test func storedRawValuesNeverChange() {
-        #expect(RepeatKind.allCases.map(\.rawValue) == ["none", "daily", "weekly", "monthly"])
+        #expect(RepeatKind.allCases.map(\.rawValue) == ["none", "daily", "weekly", "monthly", "yearly"])
         #expect(Weekday.weekdaysMask == 31)
         #expect(Weekday.weekendMask == 96)
     }

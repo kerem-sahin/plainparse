@@ -20,8 +20,8 @@ struct WrittenHourTests {
         #expect(tr.parse("sekizde koşu", now: now).title == "Koşu")
         #expect(tr.parse("dokuza toplantı koy", now: now).minute == 9 * 60)
         #expect(tr.parse("yedide kalk", now: now).minute == 7 * 60)
-        #expect(tr.parse("dörtte çay", now: now).minute == 4 * 60)
-        #expect(tr.parse("dörde kadar rapor", now: now).minute == 4 * 60)
+        #expect(tr.parse("dörtte çay", now: now).minute == 16 * 60)
+        #expect(tr.parse("dörde kadar rapor", now: now).minute == 16 * 60)
     }
 
     @Test func twoWordHours() {
@@ -72,7 +72,7 @@ struct WrittenHourTests {
         #expect(en.parse("call mom at eight", now: now).title == "Call mom")
         #expect(en.parse("dinner seven pm", now: now).minute == 19 * 60)
         #expect(en.parse("standup at nine thirty", now: now).minute == 9 * 60 + 30)
-        #expect(en.parse("gym six o'clock", now: now).minute == 6 * 60)
+        #expect(en.parse("gym six o'clock", now: now).minute == 18 * 60)
         #expect(en.parse("buy eight eggs", now: now).minute == nil)
         #expect(en.parse("buy eight eggs", now: now).title == "Buy eight eggs")
     }
